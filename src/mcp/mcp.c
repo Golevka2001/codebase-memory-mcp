@@ -3536,11 +3536,35 @@ static char *handle_search_code(cbm_mcp_server_t *srv, const char *args) {
     }
 
     if (!validate_search_args(root_path, file_pattern)) {
+        if (has_path_filter) {
+            cbm_regfree(&path_regex);
+        }
         free(root_path);
         free(pattern);
         free(project);
         free(file_pattern);
         return cbm_mcp_text_result("path or file_pattern contains invalid characters", true);
+    }
+
+    /* issue #283: when regex=true, a syntactically invalid pattern (e.g. an
+     * unclosed group) makes the underlying grep fail, which the handler would
+     * otherwise report as an empty result set — indistinguishable from a
+     * legitimate no-match. Validate the user's regex up front and return an
+     * explicit error so callers can tell "broken pattern" from "no matches". */
+    if (use_regex) {
+        cbm_regex_t probe;
+        if (cbm_regcomp(&probe, pattern, CBM_REG_EXTENDED | CBM_REG_NOSUB) != CBM_REG_OK) {
+            if (has_path_filter) {
+                cbm_regfree(&path_regex);
+            }
+            free(root_path);
+            free(pattern);
+            free(project);
+            free(file_pattern);
+            return cbm_mcp_text_result(
+                "invalid regex pattern (regex=true): check for unbalanced (), [], or {}", true);
+        }
+        cbm_regfree(&probe);
     }
 
     /* ── Phase 0.5: Multi-word → regex conversion ───────────── */
