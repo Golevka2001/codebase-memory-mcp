@@ -372,6 +372,7 @@ static const ext_entry_t EXT_TABLE[] = {
 
     /* Go Template */
     {".gotmpl", CBM_LANG_GOTEMPLATE},
+    {".tpl", CBM_LANG_GOTEMPLATE}, /* Helm _helpers.tpl named-template definitions */
 
     /* Hare */
     {".ha", CBM_LANG_HARE},

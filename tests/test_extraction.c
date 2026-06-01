@@ -277,6 +277,28 @@ TEST(extract_cfml_tag_issue38) {
     PASS();
 }
 
+/* --- Helm / Go template: named templates + include calls (#338) --- */
+TEST(extract_helm_templates_issue338) {
+    CBMFileResult *r = extract("{{- define \"chart.fullname\" -}}\n"
+                               "{{- .Release.Name -}}\n"
+                               "{{- end -}}\n"
+                               "\n"
+                               "{{- define \"chart.labels\" -}}\n"
+                               "app: {{ include \"chart.fullname\" . }}\n"
+                               "chart: {{ template \"chart.fullname\" . }}\n"
+                               "{{- end -}}\n",
+                               CBM_LANG_GOTEMPLATE, "chart", "templates/_helpers.tpl");
+    ASSERT_NOT_NULL(r);
+    ASSERT_FALSE(r->has_error);
+    /* define -> Function nodes */
+    ASSERT(has_def(r, "Function", "chart.fullname"));
+    ASSERT(has_def(r, "Function", "chart.labels"));
+    /* include / template -> CALLS to the named template (not to "include") */
+    ASSERT(has_call(r, "chart.fullname"));
+    cbm_free_result(r);
+    PASS();
+}
+
 /* --- Java --- */
 TEST(java_class) {
     CBMFileResult *r = extract(
@@ -2554,6 +2576,7 @@ SUITE(extraction) {
     RUN_TEST(extract_qml_issue42);
     RUN_TEST(extract_cfscript_issue38);
     RUN_TEST(extract_cfml_tag_issue38);
+    RUN_TEST(extract_helm_templates_issue338);
 
     /* OOP */
     RUN_TEST(java_class);

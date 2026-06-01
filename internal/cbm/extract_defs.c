@@ -3674,6 +3674,40 @@ static void extract_cfml_function_tag(CBMExtractCtx *ctx, TSNode node) {
     cbm_defs_push(&ctx->result->defs, a, def);
 }
 
+// Helm / Go template named-template definition: {{ define "chart.fullname" }} ...
+// {{ end }} (#338). The name is a string-literal child of define_action. Emit a
+// Function node so `include`/`template` references resolve to it via CALLS.
+static void extract_gotemplate_define(CBMExtractCtx *ctx, TSNode node) {
+    CBMArena *a = ctx->arena;
+    TSNode s = cbm_find_child_by_kind(node, "interpreted_string_literal");
+    if (ts_node_is_null(s)) {
+        return;
+    }
+    char *raw = cbm_node_text(a, s, ctx->source);
+    if (!raw) {
+        return;
+    }
+    size_t len = strlen(raw);
+    if (len >= 2 && (raw[0] == '"' || raw[0] == '`')) {
+        raw = cbm_arena_strndup(a, raw + 1, len - 2); // strip surrounding quotes
+    }
+    if (!raw || !raw[0]) {
+        return;
+    }
+
+    CBMDefinition def;
+    memset(&def, 0, sizeof(def));
+    def.name = raw;
+    def.qualified_name = cbm_fqn_compute(a, ctx->project, ctx->rel_path, raw);
+    def.label = "Function";
+    def.file_path = ctx->rel_path;
+    def.start_line = ts_node_start_point(node).row + TS_LINE_OFFSET;
+    def.end_line = ts_node_end_point(node).row + TS_LINE_OFFSET;
+    def.lines = (int)(def.end_line - def.start_line + TS_LINE_OFFSET);
+    def.is_exported = true;
+    cbm_defs_push(&ctx->result->defs, a, def);
+}
+
 // Languages that use the C preprocessor and therefore have #define macros.
 static bool is_c_preprocessor_lang(CBMLanguage lang) {
     return lang == CBM_LANG_C || lang == CBM_LANG_CPP || lang == CBM_LANG_CUDA ||
@@ -3741,6 +3775,11 @@ static void walk_defs(CBMExtractCtx *ctx, TSNode root, const CBMLangSpec *spec, 
         if (ctx->language == CBM_LANG_CFML && strcmp(kind, "cf_function_tag") == 0) {
             extract_cfml_function_tag(ctx, node);
             // fall through: descend into the body for nested tags / calls
+        }
+
+        if (ctx->language == CBM_LANG_GOTEMPLATE && strcmp(kind, "define_action") == 0) {
+            extract_gotemplate_define(ctx, node);
+            // fall through: descend into the body for nested defines
         }
 
         if (cbm_kind_in_set(node, spec->function_node_types)) {

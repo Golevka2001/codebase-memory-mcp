@@ -759,6 +759,11 @@ TEST(lang_ext_cfml) {
     PASS();
 }
 
+TEST(lang_ext_helm_tpl) {
+    ASSERT_EQ(cbm_language_for_extension(".tpl"), CBM_LANG_GOTEMPLATE);
+    PASS();
+}
+
 TEST(lang_ext_janet) {
     ASSERT_EQ(cbm_language_for_extension(".janet"), CBM_LANG_JANET);
     PASS();
@@ -1229,6 +1234,7 @@ SUITE(language) {
     RUN_TEST(lang_ext_luau);
     RUN_TEST(lang_ext_qml);
     RUN_TEST(lang_ext_cfml);
+    RUN_TEST(lang_ext_helm_tpl);
     RUN_TEST(lang_ext_janet);
     RUN_TEST(lang_ext_sway);
     RUN_TEST(lang_ext_nasm);
