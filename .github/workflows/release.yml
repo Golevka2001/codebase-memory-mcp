@@ -184,6 +184,9 @@ jobs:
   # ── 7. Verify + Publish (requires security gate) ───────────────
   verify:
     needs: [release-draft, security]
+    # Explicit condition: a skipped ancestor (soak with soak_level=none) must
+    # not skip the publish chain — only real failures/cancellations block it.
+    if: ${{ !cancelled() && !failure() && needs.release-draft.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -282,6 +285,7 @@ jobs:
   # release stays in draft so we can re-run without a half-shipped state.
   publish-registries:
     needs: [verify]
+    if: ${{ !cancelled() && !failure() && needs.verify.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -355,6 +359,7 @@ jobs:
   # not touch npm/PyPI, so retries are safe.
   publish-mcp-registry:
     needs: [publish-registries]
+    if: ${{ !cancelled() && !failure() && needs.publish-registries.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write   # GitHub OIDC auth to the MCP Registry
@@ -386,6 +391,7 @@ jobs:
   # re-tried with replace=true — no half-shipped state visible to users.
   publish-final:
     needs: [verify, publish-registries]
+    if: ${{ !cancelled() && !failure() && needs.verify.result == 'success' && needs.publish-registries.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
